@@ -1,0 +1,33 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+     "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<title>jQuery iCalendar</title>
+<style type="text/css">
+@import "css/jquery.icalendar.css";
+</style>
+<script type="text/javascript" src="js/jquery-1.3.2.js"></script>
+<script type="text/javascript" src="js/jquery.icalendar.js"></script>
+<script type="text/javascript">
+$(function () {
+	var AustDayLunch = {start: new Date(2008, 1-1, 26, 11, 30, 00),
+		end: new Date(2008, 1-1, 26, 12, 45, 00),
+		title: 'Australia Day lunch',
+		description: 'A traditional barbeque for our big day',
+		location: 'On your local beach'};
+	$('#basicICal').icalendar($.extend({icons: 'img/icalendar.png'}, AustDayLunch));
+});
+</script>
+</head>
+<body>
+<h1>jQuery iCalendar Basics</h1>
+<p>This page demonstrates the very basics of the
+	<a href="http://keith-wood.name/icalendar.html">jQuery iCalendar plugin</a>.
+	It contains the minimum requirements for using the plugin and
+	can be used as the basis for your own experimentation.</p>
+<p>For more detail see the <a href="http://keith-wood.name/icalendarRef.html">documentation reference</a> page.</p>
+<p>Join us on Australia Day.</p>
+<div id="basicICal"></div>
+</body>
+</html>

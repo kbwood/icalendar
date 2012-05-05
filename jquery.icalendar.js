@@ -1,6 +1,6 @@
 /* http://keith-wood.name/icalendar.html
-   iCalendar processing for jQuery v1.0.0.
-   Written by Keith Wood (kbwood@virginbroadband.com.au) October 2008.
+   iCalendar processing for jQuery v1.1.0.
+   Written by Keith Wood (kbwood{at}iinet.com.au) October 2008.
    Dual licensed under the GPL (http://dev.jquery.com/browser/trunk/jquery/GPL-LICENSE.txt) and 
    MIT (http://dev.jquery.com/browser/trunk/jquery/MIT-LICENSE.txt) licenses. 
    Please attribute the author if you use it. */
@@ -18,6 +18,8 @@ function iCalendar() {
 		iconSize: 16,  // The size of the individual icons
 		target: '_blank',  // The name of the target window for the iCalendar links
 		compact: false,  // True if a compact presentation should be used, false for full
+		popup: false,  // True to have it popup on demand, false to show always
+		popupText: 'Send to my calendar...', // Text for the popup trigger
 		tipPrefix: '',  // Additional text to show in the tool tip for each icon
 		echoUrl: '',  // The URL to echo back iCalendar content, or blank for clipboard
 		echoField: '', // The ID of a field to copy the iCalendar definition into, or blank for clipboard
@@ -29,22 +31,35 @@ function iCalendar() {
 		location: '',  // The location of the event
 		url: '',  // A URL with more information about the event
 		contact: '',  // An e-mail address for further contact about the event
-		copyConfirm: 'The event will be copied to your clipboard. Continue?', // Confirmation message for clipboard copy
-		copySucceeded: 'The event has been copied to your clipboard', // Success message during clipboard copy
-		copyFailed: 'Failed to copy the event to the clipboard\n', // Failure message during clipboard copy
+		recurrence: null, // Details about a recurring event, an object with attributes:
+			// dates (Date or Date[]) or times (Date or Date[]) or
+			// periods (Date[2] or Date[][2] or [][Date, string]) or
+			// freq (string - secondly, minutely, hourly, daily, weekly, monthly, yearly),
+			// interval (number), until (Date), count (number), weekStart (number),
+			// by (object or object[] - type (string - second, minute, day, monthday, yearday,
+			// weekno, month, setpos), values (number or number[] or string or string[]))
+		// Confirmation message for clipboard copy
+		copyConfirm: 'The event will be copied to your clipboard. Continue?',
+		// Success message during clipboard copy
+		copySucceeded: 'The event has been copied to your clipboard',
+		// Failure message during clipboard copy
+		copyFailed: 'Failed to copy the event to the clipboard\n',
 		copyFlash: 'clipboard.swf', // The URL for the Flash clipboard copy module
 		// Clipboard not supported message
 		copyUnavailable: 'The clipboard is unavailable, please copy the event details from below:\n'
 	};
 	this._sites = {  // The definitions of the available iCalendar sites
-		'google': {display: 'Google', icon: 0,
-			url: 'http://www.google.com/calendar/event?action=TEMPLATE&text={t}&dates={s}/{e}&details={d}&location={l}'},
-		'icalendar': {display: 'iCalendar', icon: 1, url: 'echo'},
-		'outlook': {display: 'Outlook', icon: 2, url: 'echo'},
-		'yahoo': {display: 'Yahoo', icon: 3,
-			url: 'http://calendar.yahoo.com/?v=60&view=d&type=20&title={t}&st={s}&dur={p}&desc={d}&in_loc={l}'}
+		'google': {display: 'Google', icon: 0, override: null,
+			url: 'http://www.google.com/calendar/event?action=TEMPLATE' +
+			'&amp;text={t}&amp;dates={s}/{e}&amp;details={d}&amp;location={l}&amp;sprop=website:{u}'},
+		'icalendar': {display: 'iCalendar', icon: 1, override: null, url: 'echo'},
+		'outlook': {display: 'Outlook', icon: 2, override: null, url: 'echo'},
+		'yahoo': {display: 'Yahoo', icon: 3, override: yahooOverride,
+			url: 'http://calendar.yahoo.com/?v=60&amp;view=d&amp;type=20' +
+			'&amp;title={t}&amp;st={s}&amp;dur={p}&amp;desc={d}&amp;in_loc={l}&amp;url={u}&amp;rpat={r}'}
 	};
 }
+
 var FREQ_SETTINGS = [{method: 'Seconds', factor: 1},
 	{method: 'Minutes', factor: 60}, {method: 'Hours', factor: 3600},
 	{method: 'Date', factor: 86400}, {method: 'Month', factor: 1},
@@ -70,22 +85,24 @@ $.extend(iCalendar.prototype, {
 	},
 
 	/* Add a new iCalendar site to the list.
-	   @param  id       (string) the ID of the new site
-	   @param  display  (string) the display name for this site
-	   @param  icon     (url) the location of an icon for this site (16x16), or
-	                    (number) the index of the icon within the combined image
-	   @param  url      (url) the submission URL for this site
-	                    with {t} marking where the event title should be inserted,
-	                    {s} indicating the event start date/time insertion point,
-	                    {e} indicating the event end date/time insertion point,
-	                    {p} indicating the event period (duration) insertion point,
-	                    {d} indicating the event description insertion point,
-	                    {l} indicating the event location insertion point,
-	                    {u} indicating the event URL insertion point,
-	                    {c} indicating the event contact insertion point
+	   @param  id        (string) the ID of the new site
+	   @param  display   (string) the display name for this site
+	   @param  icon      (url) the location of an icon for this site (16x16), or
+	                     (number) the index of the icon within the combined image
+	   @param  url       (url) the submission URL for this site
+	                     with {t} marking where the event title should be inserted,
+	                     {s} indicating the event start date/time insertion point,
+	                     {e} indicating the event end date/time insertion point,
+	                     {p} indicating the event period (duration) insertion point,
+	                     {d} indicating the event description insertion point,
+	                     {l} indicating the event location insertion point,
+	                     {u} indicating the event URL insertion point,
+	                     {c} indicating the event contact insertion point,
+	                     {r} indicating the event recurrence insertion point
+	   @param  override  (function, optional) a function to override default settings
 	   @return void */
-	addSite: function(id, display, icon, url) {
-		this._sites[id] = {display: display, icon: icon, url: url};
+	addSite: function(id, display, icon, url, override) {
+		this._sites[id] = {display: display, icon: icon, override: override, url: url};
 		return this;
 	},
 
@@ -123,9 +140,6 @@ $.extend(iCalendar.prototype, {
 		settings = extendRemove($.extend({}, this._defaults,
 			$.data(target[0], PROP_NAME) || {}), settings);
 		$.data(target[0], PROP_NAME, settings);
-		if (!target[0].id) {
-			target[0].id = 'ic' + new Date().getTime();
-		}
 		var sites = settings.sites || this._defaults.sites;
 		if (sites.length == 0) { // default to all sites
 			$.each(this._sites, function(id) {
@@ -133,43 +147,75 @@ $.extend(iCalendar.prototype, {
 			});
 		}
 		var addSite = function(site, calId) {
-			var url = (site.url == 'echo' ? '#' : 
-				site.url.replace(/{t}/, escape(settings.title)).
-				replace(/{d}/, escape(settings.description)).
-				replace(/{s}/, $.icalendar.formatDate(settings.start)).
-				replace(/{e}/, $.icalendar.formatDate(settings.end)).
-				replace(/{p}/, $.icalendar.calculateDuration(settings.start, settings.end)).
-				replace(/{l}/, escape(settings.location)).
-				replace(/{u}/, escape(settings.url)).
-				replace(/{c}/, escape(settings.contact)));
-			var html = '<li><a href="' + url + '" title="' + settings.tipPrefix + site.display + '" ' +
-				(site.url == 'echo' ?
-				'onclick="return jQuery.icalendar._echo(\'#' + target[0].id + '\',\'' + calId + '\')"' :
-				'target="' + settings._target + '"') + '>';
+			var inserts = {t: encodeURIComponent(settings.title),
+				d: encodeURIComponent(settings.description),
+				s: $.icalendar.formatDateTime(settings.start),
+				e: $.icalendar.formatDateTime(settings.end),
+				p: $.icalendar.calculateDuration(settings.start, settings.end),
+				l: encodeURIComponent(settings.location),
+				u: encodeURIComponent(settings.url),
+				c: encodeURIComponent(settings.contact),
+				r: makeRecurrence(settings.recurrence)};
+			if (site.override) {
+				site.override.apply(target, [inserts, settings]);
+			}
+			var url = site.url;
+			$.each(inserts, function(n, v) {
+				var re = new RegExp('\\{' + n + '\\}', 'g');
+				url = url.replace(re, v);
+			});
+			var url = (site.url == 'echo' ? '#' : url);
+			var item = $('<li></li>');
+			var anchor = $('<a href="' + url + '" title="' + settings.tipPrefix + site.display + '"' +
+				(site.url == 'echo' ? '' : ' target="' + settings._target + '"') + '></a>');
+			if (site.url == 'echo') {
+				anchor.click(function() {
+					return $.icalendar._echo(target[0], calId);
+				});
+			}
+			var html = '';
 			if (site.icon != null) {
 				if (typeof site.icon == 'number') {
 					html += '<span style="background: ' +
 						'transparent url(' + settings.icons + ') no-repeat -' +
 						(site.icon * settings.iconSize) + 'px 0px;' +
-						($.browser.mozilla && $.browser.version.substr(0, 3) != '1.9' ?
-						' padding-left: ' + settings.iconSize +
-						'px; padding-bottom: 3px;' : '') + '"></span>';
+						($.browser.mozilla && $.browser.version < '1.9' ?
+						' padding-left: ' + settings.iconSize + 'px; padding-bottom: ' +
+						Math.max(0, (settings.iconSize / 2) - 5) + 'px;' : '') + '"></span>';
 				}
 				else {
-					html += '<img src="' + site.icon + '"/>';
+					html += '<img src="' + site.icon + '"' +
+						(($.browser.mozilla && $.browser.version < '1.9') ||
+						($.browser.msie && $.browser.version < '7.0') ?
+						' style="vertical-align: bottom;"' :
+						($.browser.msie ? ' style="vertical-align: middle;"' :
+						($.browser.opera || $.browser.safari ?
+						' style="vertical-align: baseline;"' : ''))) + '/>';
 				}
 				html +=	(settings.compact ? '' : '&#xa0;');
 			}
-			html +=	(settings.compact ? '' : site.display) + '</a></li>';
-			return html;
+			anchor.html(html + (settings.compact ? '' : site.display));
+			item.append(anchor);
+			return item;
 		};
-		var html = '<ul class="icalendar_list' + (settings.compact ? ' icalendar_compact' : '') + '">';
+		var list = $('<ul class="icalendar_list' +
+			(settings.compact ? ' icalendar_compact' : '') + '"></ul>');
 		var allSites = this._sites;
 		$.each(sites, function(index, id) {
-			html += addSite(allSites[id], id);
+			list.append(addSite(allSites[id], id));
 		});
-		html += '</ul>';
-		target.html(html);
+		target.empty().append(list);
+		if (settings.popup) {
+			list.before('<span class="icalendar_popup_text">' +
+				settings.popupText + '</span>').
+				wrap('<div class="icalendar_popup"></div>');
+			target.click(function() {
+				var target = $(this);
+				var offset = target.offset();
+				$('.icalendar_popup', target).css('left', offset.left).
+					css('top', offset.top + target.outerHeight()).toggle();
+			});
+		}
 	},
 
 	/* Remove the iCalendar widget from a div. */
@@ -184,10 +230,10 @@ $.extend(iCalendar.prototype, {
 
 	/* Echo the iCalendar text back to the user either as a
 	   downloadable file or via the clipboard.
-	   @param  id     (string) the ID of the owning division
+	   @param  target  (element) the owning division
 	   @param  calId  (string) the ID of the site to send the calendar to */
-	_echo: function(id, calId) {
-		var settings = $.data($(id)[0], PROP_NAME);
+	_echo: function(target, calId) {
+		var settings = $.data(target, PROP_NAME);
 		var event = makeICalendar(settings);
 		if (settings.echoUrl) {
 			window.location.href = settings.echoUrl + '?content=' + escape(event);
@@ -202,29 +248,41 @@ $.extend(iCalendar.prototype, {
 			var error = '';
 			if (error = copyViaFlash(event, settings.copyFlash)) {
 				alert(settings.copyFailed + error);
-			}
-			else {
+				}
+				else {
 				alert(settings.copySucceeded);
+				}
 			}
-		}
 		return false; // Don't follow link
 	},
 	
-	/* Format a date/time for iCalendar: yyyymmddThhmmss[Z].
+	/* Ensure a string has at least two digits.
+	   @param  value  (number) the number to convert
+	   @return  (string) the string equivalent */
+	_ensureTwo: function(value) {
+		return (value < 10 ? '0' : '') + value;
+	},
+
+	/* Format a date for iCalendar: yyyymmdd.
 	   @param  date   (Date) the date to format
-	   @param  local  (boolean) true if this should be a local date/time
 	   @return  (string) the formatted date */
 	formatDate: function(date, local) {
-		var ensureTwo = function(value) {
-			return (value < 10 ? '0' : '') + value;
-		};
-		date = (date ? new Date(date.getTime()) : null);
-		return (!date ? '' : (local ? '' + date.getFullYear() + ensureTwo(date.getMonth() + 1) +
-			ensureTwo(date.getDate()) + 'T' + ensureTwo(date.getHours()) +
-			ensureTwo(date.getMinutes()) + ensureTwo(date.getSeconds()) :
-			'' + date.getUTCFullYear() + ensureTwo(date.getUTCMonth() + 1) +
-			ensureTwo(date.getUTCDate()) + 'T' + ensureTwo(date.getUTCHours()) +
-			ensureTwo(date.getUTCMinutes()) + ensureTwo(date.getUTCSeconds()) + 'Z'));
+		return (!date ? '' : '' + date.getFullYear() +
+			this._ensureTwo(date.getMonth() + 1) + this._ensureTwo(date.getDate()));
+	},
+
+	/* Format a date/time for iCalendar: yyyymmddThhmmss[Z].
+	   @param  dateTime  (Date) the date/time to format
+	   @param  local     (boolean) true if this should be a local date/time
+	   @return  (string) the formatted date/time */
+	formatDateTime: function(dateTime, local) {
+		return (!dateTime ? '' : (local ?
+			'' + dateTime.getFullYear() + this._ensureTwo(dateTime.getMonth() + 1) +
+			this._ensureTwo(dateTime.getDate()) + 'T' + this._ensureTwo(dateTime.getHours()) +
+			this._ensureTwo(dateTime.getMinutes()) + this._ensureTwo(dateTime.getSeconds()) :
+			'' + dateTime.getUTCFullYear() + this._ensureTwo(dateTime.getUTCMonth() + 1) +
+			this._ensureTwo(dateTime.getUTCDate()) + 'T' + this._ensureTwo(dateTime.getUTCHours()) +
+			this._ensureTwo(dateTime.getUTCMinutes()) + this._ensureTwo(dateTime.getUTCSeconds()) + 'Z'));
 	},
 
 	/* Calculate the duration between two date/times.
@@ -310,6 +368,10 @@ $.extend(iCalendar.prototype, {
 	   @return  (number) the week for these parameters (1-53) */
 	getWeekOfYear: function(date, weekStart) {
 		return getWeekOfYear(date, weekStart);
+	},
+
+	_parseParams: function(owner, params) {
+		return parseParams(owner, params);
 	}
 });
 
@@ -344,6 +406,23 @@ $.fn.icalendar = function(options) {
 /* Initialise the iCalendar functionality. */
 $.icalendar = new iCalendar(); // singleton instance
 
+/* Override some substitution values for Yahoo.
+   @param  inserts   (object) current values (updated)
+   @param  settings  (object) current instance settings */
+function yahooOverride(inserts, settings) {
+	var twoDigits = function(value) {
+		return (value < 10 ? '0' : '') + value;
+	};
+	var dur = (settings.end ? (settings.end.getTime() - settings.start.getTime()) / 60000 : 0);
+	inserts.p = (dur ? twoDigits(Math.floor(dur / 60)) + '' + twoDigits(dur % 60) : ''); // hhmm
+	if (inserts.r) {
+		var byDay = (settings.recurrence.by && settings.recurrence.by[0].type == 'day' ?
+			settings.recurrence.by[0].values.join('').toLowerCase() : '');
+		var freq = {daily: 'dy', weekly: 'wk', monthly: 'mh', yearly: 'yr'}[settings.recurrence.freq];
+		inserts.r = (byDay || freq ? twoDigits(settings.recurrence.interval || 1) + (byDay || freq) : '');
+	}
+}
+
 /* Construct an iCalendar with an event object.
    @param  event  (object) the event details
    @return  (string) the iCalendar definition */
@@ -360,17 +439,82 @@ function makeICalendar(event) {
 	return 'BEGIN:VCALENDAR\n' +
 		'VERSION:2.0\n' +
 		'PRODID:jquery.icalendar\n' +
+		'METHOD:PUBLISH\n' +
 		'BEGIN:VEVENT\n' +
+		'UID:' + new Date().getTime() + '@' +
+		(window.location.href.replace(/^[^\/]*\/\/([^\/]*)\/.*$/, '$1') || 'localhost') + '\n' +
+		'DTSTAMP:' + $.icalendar.formatDateTime(new Date()) + '\n' +
 		(event.url ? limit75('URL:' + event.url) + '\n' : '') +
 		(event.contact ? limit75('MAILTO:' + event.contact) + '\n' : '') +
 		limit75('TITLE:' + event.title) + '\n' +
-		'DTSTART:' + $.icalendar.formatDate(event.start) + '\n' +
-		'DTEND:' + $.icalendar.formatDate(event.end) + '\n' +
+		'DTSTART:' + $.icalendar.formatDateTime(event.start) + '\n' +
+		'DTEND:' + $.icalendar.formatDateTime(event.end) + '\n' +
 		(event.summary ? limit75('SUMMARY:' + event.summary) + '\n' : '') +
 		(event.description ? limit75('DESCRIPTION:' + event.description) + '\n' : '') +
 		(event.location ? limit75('LOCATION:' + event.location) + '\n' : '') +
+		(event.recurrence ? makeRecurrence(event.recurrence) + '\n' : '') +
 		'END:VEVENT\n' +
 		'END:VCALENDAR';
+}
+
+/* Construct an iCalendar recurrence definition.
+   @param  recur  (object) the recurrence details
+   @return  (string) the iCalendar definition */
+function makeRecurrence(recur) {
+	if (!recur) {
+	return '';
+	}
+	var def = '';
+	if (recur.dates) {
+		def = 'RDATE;VALUE=DATE:';
+		if (!isArray(recur.dates)) {
+			recur.dates = [recur.dates];
+		}
+		for (var i = 0; i < recur.dates.length; i++) {
+			def += (i > 0 ? ',' : '') + $.icalendar.formatDate(recur.dates[i]);
+		}
+	}
+	else if (recur.times) {
+		def = 'RDATE;VALUE=DATE-TIME:';
+		if (!isArray(recur.times)) {
+			recur.times = [recur.times];
+		}
+		for (var i = 0; i < recur.times.length; i++) {
+			def += (i > 0 ? ',' : '') + $.icalendar.formatDateTime(recur.times[i]);
+		}
+	}
+	else if (recur.periods) {
+		def = 'RDATE;VALUE=PERIOD:';
+		if (!isArray(recur.periods[0])) {
+			recur.periods = [recur.periods];
+		}
+		for (var i = 0; i < recur.periods.length; i++) {
+			def += (i > 0 ? ',' : '') + $.icalendar.formatDateTime(recur.periods[i][0]) +
+				'/' + (recur.periods[i][1].constructor != Date ? recur.periods[i][1] :
+				$.icalendar.formatDateTime(recur.periods[i][1]));
+		}
+	}
+	else {
+		def = 'RRULE:FREQ=' + (recur.freq || 'daily').toUpperCase() +
+			(recur.interval ? ';INTERVAL=' + recur.interval : '') +
+			(recur.until ? ';UNTIL=' + $.icalendar.formatDateTime(recur.until) :
+			(recur.count ? ';COUNT=' + recur.count : '')) +
+			(recur.weekStart != null ? ';WKST=' +
+			['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][recur.weekStart] : '');
+		if (recur.by) {
+			if (!isArray(recur.by)) {
+				recur.by = [recur.by];
+			}
+			for (var i = 0; i < recur.by.length; i++) {
+				if (!isArray(recur.by[i].values)) {
+					recur.by[i].values = [recur.by[i].values];
+				}
+				def += ';BY' + recur.by[i].type.toUpperCase() + '=' +
+					recur.by[i].values.join(',');
+			}
+		}
+	}
+	return def;
 }
 
 /* Copy the given text to the system clipboard via Flash.
@@ -381,8 +525,8 @@ function copyViaFlash(text, url) {
 	$('#' + FLASH_ID).remove();
 	try {
 		$('body').append('<div id="' + FLASH_ID + '"><embed src="' + url +
-			'" FlashVars="clipboard=' + encodeURIComponent(text) +
-			'" width="0" height="0" type="application/x-shockwave-flash"></embed></div>');
+		'" FlashVars="clipboard=' + encodeURIComponent(text) +
+		'" width="0" height="0" type="application/x-shockwave-flash"></embed></div>');
 		return '';
 	}
 	catch(e) {
@@ -412,7 +556,7 @@ var RESERVED_NAMES = ['class'];
    @param  content  (string) the original iCalendar data
    @return  (string[]) the restored iCalendar data */
 function unfoldLines(content) {
-	var lines = content.split('\n');
+	var lines = content.replace(/\r\n/g, '\n').split('\n');
 	for (var i = lines.length - 1; i > 0; i--) {
 		var matches = FOLDED.exec(lines[i]);
 		if (matches) {
@@ -455,7 +599,7 @@ function parseGroup(lines, index, owner, timezones) {
 		var matches = TZ_OFFSET.exec(group.standard.tzoffsetto);
 		if (matches) {
 			timezones[group.tzid] = (matches[1] == '-' ? -1 : +1) *
-				(parseInt(matches[2]) * 60 + parseInt(matches[3]));
+				(parseInt(matches[2], 10) * 60 + parseInt(matches[3], 10));
 		}
 	}
 	else {

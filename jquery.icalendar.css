@@ -1,4 +1,28 @@
-/* jQuery iCalendar styles */
+/* jQuery iCalendar styles v1.1.0 */
+.icalendar_popup_text {
+	cursor: pointer;
+	color: blue;
+	text-decoration: underline;
+}
+.icalendar_popup {
+	display: none;
+	position: absolute;
+	z-index: 100;
+}
+.icalendar_popup ul {
+	float: left;
+	width: 220px;
+	padding: 2px;
+	background-color: #eee;
+	border: 1px solid #aaa;
+}
+.icalendar_popup .icalendar_list li {
+	width: 50%;
+	margin: 0%;
+	padding: 2px 0px;
+	background-color: transparent;
+	border: none;
+}
 .icalendar_list {
 	display: block;
 	list-style-type: none;
@@ -17,8 +41,8 @@ html:first-child .icalendar_list {  /* Opera */
 .icalendar_list li {
 	float: left;
 	width: 12%;
-	margin: 0% 0.25%;
-	padding: 2px;
+	margin: 0px 1px;
+	padding: 1px;
 	background-color: #eee;
 	border: 1px outset;
 }
@@ -29,12 +53,14 @@ html:first-child .icalendar_list {  /* Opera */
 .icalendar_compact li {
 	width: 16px;
 	height: 16px;
-	margin: 0%;
+	margin: 0px;
+	padding: 2px;
 	background-color: transparent;
 	border: none;
 }
 .icalendar_list a {
 	width: 100%;
+	text-decoration: none;
 }
 .icalendar_list span {
 	display: inline-block;
@@ -42,17 +68,5 @@ html:first-child .icalendar_list {  /* Opera */
 	height: 16px;
 }
 .icalendar_list img {
-	float: left;
 	border: none;
-	vertical-align: bottom;
-}
-@media screen and (-webkit-min-device-pixel-ratio:0) {  /* Safari3/Opera9 */
-	.icalendar_list img {
-		margin-bottom: 3px;
-		vertical-align: middle;
-	}
-}
-html:first-child .icalendar_list img { /* Opera */
-	margin-bottom: 3px;
-	vertical-align: middle;
 }
