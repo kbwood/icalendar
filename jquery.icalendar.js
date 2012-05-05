@@ -1,5 +1,5 @@
 /* http://keith-wood.name/icalendar.html
-   iCalendar processing for jQuery v1.1.0.
+   iCalendar processing for jQuery v1.1.1.
    Written by Keith Wood (kbwood{at}iinet.com.au) October 2008.
    Dual licensed under the GPL (http://dev.jquery.com/browser/trunk/jquery/GPL-LICENSE.txt) and 
    MIT (http://dev.jquery.com/browser/trunk/jquery/MIT-LICENSE.txt) licenses. 
@@ -537,7 +537,11 @@ function copyViaFlash(text, url) {
 /* Pattern for folded lines: start with a whitespace character */
 var FOLDED = /^\s(.*)$/;
 /* Pattern for an individual entry: name:value */
-var ENTRY = /^([^:]+):(.*)$/;
+var ENTRY = /^([A-Za-z0-9-]+)((?:;[A-Za-z0-9-]+=(?:"[^"]+"|[^";:,]+)(?:,(?:"[^"]+"|[^";:,]+))*)*):(.*)$/;
+/* Pattern for an individual parameter: name=value[,value] */
+var PARAM = /;([A-Za-z0-9-]+)=((?:"[^"]+"|[^";:,]+)(?:,(?:"[^"]+"|[^";:,]+))*)/g;
+/* Pattern for an individual parameter value: value | "value" */
+var PARAM_VALUE = /,?("[^"]+"|[^";:,]+)/g;
 /* Pattern for a date only field: yyyymmdd */
 var DATEONLY = /^(\d{4})(\d\d)(\d\d)$/;
 /* Pattern for a date/time field: yyyymmddThhmmss[Z] */
@@ -686,11 +690,10 @@ function parseEntry(line) {
 	if (!matches) {
 		throw 'Missing entry name: ' + line;
 	}
-	var params = matches[1].split(';');
-	entry._name = params[0].toLowerCase();
-	entry._value = checkDate(matches[2]);
+	entry._name = matches[1].toLowerCase();
+	entry._value = checkDate(matches[3]);
 	entry._simple = true;
-	parseParams(entry, params.slice(1));
+	parseParams(entry, matches[2]);
 	return entry;
 }
 
@@ -701,12 +704,17 @@ function parseEntry(line) {
 				   _simple to indicate whether or not other parameters
    @param  params  (string or string[]) the parameters to parse */
 function parseParams(owner, params) {
-	params = (isArray(params) ? params : params.split(';'));
-	owner._simple = true;
-	for (var i = 0; i < params.length; i++) {
-		var nameValue = params[i].split('=');
-		owner[nameValue[0].toLowerCase()] = checkDate(nameValue[1] || '');
+	var param = PARAM.exec(params);
+	while (param) {
+		var values = [];
+		var value = PARAM_VALUE.exec(param[2]);
+		while (value) {
+			values.push(checkDate(value[1].replace(/^"(.*)"$/, '$1')));
+			value = PARAM_VALUE.exec(param[2]);
+		}
+		owner[param[1].toLowerCase()] = (values.length > 1 ? values : values[0]);
 		owner._simple = false;
+		param = PARAM.exec(params);
 	}
 }
 
