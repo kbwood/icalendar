@@ -276,6 +276,10 @@ $.extend(iCalendar.prototype, {
 	   @param  local     (boolean) true if this should be a local date/time
 	   @return  (string) the formatted date/time */
 	formatDateTime: function(dateTime, local) {
+		if (dateTime.getSeconds() === 0 &&  dateTime.getMinutes() === 0 && dateTime.getHours() === 0) {
+			return this.formatDate(dateTime, local);
+		}
+		
 		return (!dateTime ? '' : (local ?
 			'' + dateTime.getFullYear() + this._ensureTwo(dateTime.getMonth() + 1) +
 			this._ensureTwo(dateTime.getDate()) + 'T' + this._ensureTwo(dateTime.getHours()) +
